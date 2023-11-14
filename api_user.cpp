@@ -12,7 +12,7 @@ int main(){
     db_open_options.createIfMissing = 1;
     int ret;
     PLIOPS_DB_t plio_handle;
-    uint key = 0, write_val = 1337, read_val = 0, actual_object_size; //TODO guy make uint
+    uint key = 0, read_val = 0, actual_object_size; //TODO guy make uint
     std::vector<uint> myVector = {1337, 322, 420, 30};
 
     std::cout << "Calling PLIOPS_OpenDB!" <<std::endl;       

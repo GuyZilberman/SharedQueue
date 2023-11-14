@@ -7,9 +7,9 @@
 int main() {
     int shm_fd = shm_open(SHARED_MEMORY_NAME, O_RDWR, 0666);
     LockFreeQueue *queue = static_cast<LockFreeQueue*>(mmap(0, sizeof(LockFreeQueue), PROT_READ | PROT_WRITE, MAP_SHARED, shm_fd, 0));
+    int value = 0;
 
-    while (true) {
-        int value;
+    while (value != -1) {
         std::cout << "Enter a number: ";
         std::cin >> value;        
         while (!queue->push(value)); // Busy-wait until the value is pushed successfully
