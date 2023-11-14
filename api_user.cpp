@@ -6,13 +6,14 @@
 
 
 // TODO guy: check why I had to use export LD_LIBRARY_PATH=/etc/pliops:$LD_LIBRARY_PATH for it to work.
+// Compiled using: g++ -o api_user api_user.cpp -I/etc/pliops -L/etc/pliops -lstorelib
 int main(){
     PLIOPS_IDENTIFY_t identify = 0; //TODO guy check if I need a better identifier
     PLIOPS_DB_OPEN_OPTIONS_t db_open_options; //TODO guy check if I need other options
     db_open_options.createIfMissing = 1;
     int ret;
     PLIOPS_DB_t plio_handle;
-    uint key = 0, read_val = 0, actual_object_size; //TODO guy make uint
+    uint key = 0, read_val = 0, actual_object_size;
     std::vector<uint> myVector = {1337, 322, 420, 30};
 
     std::cout << "Calling PLIOPS_OpenDB!" <<std::endl;       
@@ -35,7 +36,7 @@ int main(){
 
     for (int i = 0 ; i < myVector.size() ; i++){
         std::cout << "Calling PLIOPS_Get!" <<std::endl;
-        ret = PLIOPS_Get(plio_handle, &i, sizeof(i), &read_val, sizeof(read_val), &actual_object_size); //TODO guy look into options
+        ret = PLIOPS_Get(plio_handle, &i, sizeof(i), &read_val, sizeof(read_val), &actual_object_size); 
         if (ret != 0) {
             printf("PLIOPS_Get Failed ret=%d\n", ret);
             exit(1);

@@ -2,7 +2,7 @@
 
 # Compile server
 echo "Compiling server..."
-g++ server.cpp -o server -lrt -lpthread
+g++ server.cpp -o server -lrt -lpthread -I/etc/pliops -L/etc/pliops -lstorelib
 
 # Check if server compilation was successful
 if [ $? -eq 0 ]; then

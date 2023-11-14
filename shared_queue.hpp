@@ -3,7 +3,7 @@
 
 #define SHARED_MEMORY_NAME "/shm_lockfree_queue"
 
-const int QUEUE_SIZE = 1024;
+const int QUEUE_SIZE = 3;
 
 //https://chat.openai.com/c/1014224d-4eb5-45ae-9862-a60a3b162a88
 
