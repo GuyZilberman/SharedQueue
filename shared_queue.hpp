@@ -1,7 +1,8 @@
 #include <atomic>
 #include <iostream>
 
-#define SHARED_MEMORY_NAME "/shm_lockfree_queue"
+#define SUBMISSION_QUEUE_NAME "/submission_queue"
+#define COMPLETION_QUEUE_NAME "/completion_queue"
 
 const int QUEUE_SIZE = 3;
 

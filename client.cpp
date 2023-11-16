@@ -5,7 +5,7 @@
 
 
 int main() {
-    int shm_fd = shm_open(SHARED_MEMORY_NAME, O_RDWR, 0666);
+    int shm_fd = shm_open(SUBMISSION_QUEUE_NAME, O_RDWR, 0666);
     LockFreeQueue *submission_queue = static_cast<LockFreeQueue*>(mmap(0, sizeof(LockFreeQueue), PROT_READ | PROT_WRITE, MAP_SHARED, shm_fd, 0));
     int value = 0;
 

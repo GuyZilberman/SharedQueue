@@ -8,16 +8,34 @@
 
 struct SharedResources {
     LockFreeQueue *submission_queue;
-    int shm_fd;
+    LockFreeQueue *completion_queue;
+    int submission_shm_fd;
+    int completion_shm_fd;
     PLIOPS_DB_t plio_handle;
     PLIOPS_IDENTIFY_t identify;
 };
 
 bool init(SharedResources &resources){
-    resources.shm_fd = shm_open(SHARED_MEMORY_NAME, O_CREAT | O_RDWR, 0666); //TODO guy
-    ftruncate(resources.shm_fd, sizeof(LockFreeQueue)); //TODO guy
-    resources.submission_queue = static_cast<LockFreeQueue*>(mmap(0, sizeof(LockFreeQueue), PROT_READ | PROT_WRITE, MAP_SHARED, resources.shm_fd, 0)); //TODO guy
+    //resources.shm_fd = shm_open(SUBMISSION_QUEUE_NAME, O_CREAT | O_RDWR, 0666); //TODO guy
+    //ftruncate(resources.shm_fd, sizeof(LockFreeQueue)); //TODO guy
+    //resources.submission_queue = static_cast<LockFreeQueue*>(mmap(0, sizeof(LockFreeQueue), PROT_READ | PROT_WRITE, MAP_SHARED, resources.shm_fd, 0)); //TODO guy
+    //new (resources.submission_queue) LockFreeQueue();
+
+    // Create and open the shared memory objects
+    resources.submission_shm_fd = shm_open(SUBMISSION_QUEUE_NAME, O_CREAT | O_RDWR, 0666);
+    resources.completion_shm_fd = shm_open(COMPLETION_QUEUE_NAME, O_CREAT | O_RDWR, 0666);
+
+    // Allocate memory for each queue
+    ftruncate(resources.submission_shm_fd, sizeof(LockFreeQueue));
+    ftruncate(resources.completion_shm_fd, sizeof(LockFreeQueue));
+
+    // Map each shared memory object into the process's address space
+    resources.submission_queue = static_cast<LockFreeQueue*>(mmap(0, sizeof(LockFreeQueue), PROT_READ | PROT_WRITE, MAP_SHARED, resources.submission_shm_fd, 0));
+    resources.completion_queue = static_cast<LockFreeQueue*>(mmap(0, sizeof(LockFreeQueue), PROT_READ | PROT_WRITE, MAP_SHARED, resources.completion_shm_fd, 0));
+
+    // Initialize the queues in the shared memory
     new (resources.submission_queue) LockFreeQueue();
+    new (resources.completion_queue) LockFreeQueue();
 
     // Start of storelib init
     resources.identify = 0; //TODO guy check if I need a better identifier
@@ -55,8 +73,8 @@ bool deinit(SharedResources &resources){
     // End of storelib deinit
 
     munmap(resources.submission_queue, sizeof(LockFreeQueue)); //TODO guy
-    close(resources.shm_fd); //TODO guy
-    shm_unlink(SHARED_MEMORY_NAME); //TODO guy
+    close(resources.submission_shm_fd); //TODO guy
+    shm_unlink(SUBMISSION_QUEUE_NAME); //TODO guy
     return true;
 }
 
