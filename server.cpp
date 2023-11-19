@@ -7,10 +7,10 @@
 
 #define NO_OPTIONS 0
 
-template<typename T>
+
 struct SharedResources {
-    LockFreeQueue<T> *submission_queue;
-    LockFreeQueue<T> *completion_queue;
+    LockFreeQueue<int> *submission_queue;
+    LockFreeQueue<int> *completion_queue;
     int submission_shm_fd;
     int completion_shm_fd;
     PLIOPS_DB_t plio_handle;
@@ -40,7 +40,7 @@ T* map_and_init_queue(int shm_fd) {
 }
 
 template<typename T>
-bool setup_queue(SharedResources<T> &resources, const char* name) {
+bool setup_queue(SharedResources &resources, const char* name) {
     int *shm_fd_ptr;
     LockFreeQueue<T>** queue_ptr;
 
@@ -72,7 +72,7 @@ bool setup_queue(SharedResources<T> &resources, const char* name) {
 }
 
 template<typename T>
-bool init(SharedResources<T> &resources){
+bool init(SharedResources &resources){
     setup_queue<T>(resources, SUBMISSION_QUEUE_NAME);
     setup_queue<T>(resources, COMPLETION_QUEUE_NAME);
 
@@ -95,7 +95,7 @@ bool init(SharedResources<T> &resources){
     }
 
 template<typename T>
-bool deinit(SharedResources<T> &resources){
+bool deinit(SharedResources &resources){
     // Start of storelib deinit
     std::cout << "Calling PLIOPS_CloseDB!" << std::endl;       
     int ret = PLIOPS_CloseDB(resources.plio_handle);
@@ -120,8 +120,7 @@ bool deinit(SharedResources<T> &resources){
     return true;
 }
 
-template<typename T>
-bool process_requests(SharedResources<T> &resources){
+bool process_requests(SharedResources &resources){
     uint key = 0, read_val = 0, actual_object_size = 0, idx = 0;
     int ret = 0, value = 0;
     while (value != -1) {
@@ -137,16 +136,16 @@ bool process_requests(SharedResources<T> &resources){
         std::cout << "Finished PLIOPS_Put!" << std::endl; 
 
 
-        std::cout << "Calling PLIOPS_Get!" << std::endl;
-        ret = PLIOPS_Get(resources.plio_handle, &idx, sizeof(idx), &read_val, sizeof(read_val), &actual_object_size);
-        if (ret != 0) {
-            printf("PLIOPS_Get Failed ret=%d\n", ret);
-            return false;
-        }
-        std::cout << "Finished PLIOPS_Get!" << std::endl; 
-        std::cout << idx << ": Called PLIOPS_Get! Value: "  << read_val << std::endl;
+        // std::cout << "Calling PLIOPS_Get!" << std::endl;
+        // ret = PLIOPS_Get(resources.plio_handle, &idx, sizeof(idx), &read_val, sizeof(read_val), &actual_object_size);
+        // if (ret != 0) {
+        //     printf("PLIOPS_Get Failed ret=%d\n", ret);
+        //     return false;
+        // }
+        // std::cout << "Finished PLIOPS_Get!" << std::endl; 
+        // std::cout << idx << ": Called PLIOPS_Get! Value: "  << read_val << std::endl;
 
-        while (!resources.completion_queue->push(read_val)); // Busy-wait until the value is pushed successfully
+        while (!resources.completion_queue->push(value)); // Busy-wait until the value is pushed successfully
         std::cout << "Server sent confirmation for the following value: " << read_val << std::endl;
 
 
@@ -156,7 +155,7 @@ bool process_requests(SharedResources<T> &resources){
 }
 
 int main() {
-    SharedResources<int> resources;
+    SharedResources resources;
 
     if (!init<int>(resources)) {
         std::cout << "Initialization failed. Exiting." << std::endl;       

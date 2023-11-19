@@ -8,6 +8,24 @@ const int QUEUE_SIZE = 3;
 
 //https://chat.openai.com/c/1014224d-4eb5-45ae-9862-a60a3b162a88
 
+enum CommandType {
+    READ,
+    WRITE
+};
+
+struct RequestMessage {
+	uint request_id;
+	CommandType cmd;
+	uint key;
+	uint data;
+};
+
+struct ResponseMessage {
+	uint request_id;
+	uint answer;
+	uint data;
+};
+
 template<typename T>
 class LockFreeQueue {
 private:
@@ -19,7 +37,7 @@ public:
     LockFreeQueue() : head(0), tail(0) {}
 
     bool push(T val) {
-        int currTail = tail.load(); //CS AFTER
+        int currTail = tail.load(); // TODO guy CS AFTER
         if ((currTail + 1) % QUEUE_SIZE == head.load()) {
             return false; // Queue full
         }
@@ -29,7 +47,7 @@ public:
     }
 
     bool pop(T &val) {
-        int currHead = head.load(); //CS AFTER?
+        int currHead = head.load(); //TODO guy CS AFTER?
         if (currHead == tail.load()) {
             return false; // Queue empty
         }
