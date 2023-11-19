@@ -9,7 +9,7 @@
 
 
 struct SharedResources {
-    LockFreeQueue<int> *submission_queue;
+    LockFreeQueue<RequestMessage> *submission_queue;
     LockFreeQueue<int> *completion_queue;
     int submission_shm_fd;
     int completion_shm_fd;
@@ -46,10 +46,10 @@ bool setup_queue(SharedResources &resources, const char* name) {
 
     if (strcmp(name, SUBMISSION_QUEUE_NAME) == 0) {
         shm_fd_ptr = &resources.submission_shm_fd;
-        queue_ptr = &resources.submission_queue;
+        queue_ptr = (LockFreeQueue<T>**)&resources.submission_queue;
     } else if (strcmp(name, COMPLETION_QUEUE_NAME) == 0) {
         shm_fd_ptr = &resources.completion_shm_fd;
-        queue_ptr = &resources.completion_queue;
+        queue_ptr = (LockFreeQueue<T>**)&resources.completion_queue;
     } else {
         std::cerr << "Wrong name" << std::endl; // Improved error message
         return false;
@@ -73,7 +73,7 @@ bool setup_queue(SharedResources &resources, const char* name) {
 
 template<typename T>
 bool init(SharedResources &resources){
-    setup_queue<T>(resources, SUBMISSION_QUEUE_NAME);
+    setup_queue<RequestMessage>(resources, SUBMISSION_QUEUE_NAME);
     setup_queue<T>(resources, COMPLETION_QUEUE_NAME);
 
     // Start of storelib init
@@ -121,35 +121,46 @@ bool deinit(SharedResources &resources){
 }
 
 bool process_requests(SharedResources &resources){
-    uint key = 0, read_val = 0, actual_object_size = 0, idx = 0;
-    int ret = 0, value = 0;
-    while (value != -1) {
-        while (!resources.submission_queue->pop(value)); // Busy-wait for a value to be available
-        std::cout << "Received: " << value << std::endl;
+    uint key = 0, read_val = 0, actual_object_size = 0;
+    int ret = 0, command = -2;
+    RequestMessage req_msg;
 
-        std::cout << idx << ": Calling PLIOPS_Put! Value: "  << value << std::endl;
-        ret = PLIOPS_Put(resources.plio_handle, &idx, sizeof(idx), &value, sizeof(value), NO_OPTIONS); //TODO guy look into options
-        if (ret != 0) {
-            printf("PLIOPS_Put Failed ret=%d\n", ret);
-            return false;
+    while (command != -1) {
+        while (!resources.submission_queue->pop(req_msg)); // Busy-wait for a value to be available
+        command = req_msg.cmd;
+
+        if (req_msg.cmd != EXIT){
+            std::cout << "Received: " << req_msg.data << std::endl;
+            if (req_msg.cmd == WRITE)
+            {
+                std::cout << req_msg.request_id << ": Calling PLIOPS_Put! Value: "  << req_msg.data << std::endl;
+                ret = PLIOPS_Put(resources.plio_handle, &req_msg.key, sizeof(req_msg.key), &req_msg.data, sizeof(req_msg.data), NO_OPTIONS); //TODO guy look into options
+                if (ret != 0) {
+                    printf("PLIOPS_Put Failed ret=%d\n", ret);
+                    return false;
+                }
+                std::cout << "Finished PLIOPS_Put!" << std::endl; 
+            }
+            else if (req_msg.cmd == READ)
+            {
+                std::cout << "Calling PLIOPS_Get!" << std::endl;
+                ret = PLIOPS_Get(resources.plio_handle, &req_msg.key, sizeof(req_msg.key), &req_msg.data, sizeof(req_msg.data), &actual_object_size);
+                if (ret != 0) {
+                    printf("PLIOPS_Get Failed ret=%d\n", ret);
+                    return false;
+                }
+                std::cout << "Finished PLIOPS_Get!" << std::endl; 
+                std::cout << req_msg.request_id << ": Called PLIOPS_Get! Value: " << req_msg.data << std::endl;
+            }
+            else
+            {
+                std::cout << "Cannot perform command " << req_msg.cmd << std::endl;
+            }
         }
-        std::cout << "Finished PLIOPS_Put!" << std::endl; 
 
+        while (!resources.completion_queue->push(req_msg.cmd)); // Busy-wait until the value is pushed successfully
+        std::cout << "Server sent confirmation for the following command: " << req_msg.cmd << std::endl;
 
-        // std::cout << "Calling PLIOPS_Get!" << std::endl;
-        // ret = PLIOPS_Get(resources.plio_handle, &idx, sizeof(idx), &read_val, sizeof(read_val), &actual_object_size);
-        // if (ret != 0) {
-        //     printf("PLIOPS_Get Failed ret=%d\n", ret);
-        //     return false;
-        // }
-        // std::cout << "Finished PLIOPS_Get!" << std::endl; 
-        // std::cout << idx << ": Called PLIOPS_Get! Value: "  << read_val << std::endl;
-
-        while (!resources.completion_queue->push(value)); // Busy-wait until the value is pushed successfully
-        std::cout << "Server sent confirmation for the following value: " << read_val << std::endl;
-
-
-        idx = idx + 1;
     }
     return true;
 }

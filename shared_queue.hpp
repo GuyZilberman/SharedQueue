@@ -9,8 +9,9 @@ const int QUEUE_SIZE = 3;
 //https://chat.openai.com/c/1014224d-4eb5-45ae-9862-a60a3b162a88
 
 enum CommandType {
-    READ,
-    WRITE
+    EXIT = -1,
+    WRITE,
+    READ
 };
 
 struct RequestMessage {
