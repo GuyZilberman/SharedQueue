@@ -71,10 +71,9 @@ bool setup_queue(SharedResources &resources, const char* name) {
     return true;
 }
 
-template<typename T>
 bool init(SharedResources &resources){
     setup_queue<RequestMessage>(resources, SUBMISSION_QUEUE_NAME);
-    setup_queue<T>(resources, COMPLETION_QUEUE_NAME);
+    setup_queue<int>(resources, COMPLETION_QUEUE_NAME);
 
     // Start of storelib init
     resources.identify = 0; //TODO guy check if I need a better identifier
@@ -94,7 +93,6 @@ bool init(SharedResources &resources){
     // End of storelib init
     }
 
-template<typename T>
 bool deinit(SharedResources &resources){
     // Start of storelib deinit
     std::cout << "Calling PLIOPS_CloseDB!" << std::endl;       
@@ -114,9 +112,14 @@ bool deinit(SharedResources &resources){
     std::cout << "Finished PLIOPS_DeleteDB!" <<std::endl;  
     // End of storelib deinit
 
-    munmap(resources.submission_queue, sizeof(LockFreeQueue<T>)); //TODO guy
-    close(resources.submission_shm_fd); //TODO guy
-    shm_unlink(SUBMISSION_QUEUE_NAME); //TODO guy
+    munmap(resources.submission_queue, sizeof(LockFreeQueue<RequestMessage>));
+    close(resources.submission_shm_fd);
+    shm_unlink(SUBMISSION_QUEUE_NAME);
+
+    munmap(resources.completion_queue, sizeof(LockFreeQueue<int>));
+    close(resources.completion_shm_fd);
+    shm_unlink(COMPLETION_QUEUE_NAME);
+
     return true;
 }
 
@@ -168,7 +171,7 @@ bool process_requests(SharedResources &resources){
 int main() {
     SharedResources resources;
 
-    if (!init<int>(resources)) {
+    if (!init(resources)) {
         std::cout << "Initialization failed. Exiting." << std::endl;       
         return 1;
     }
@@ -178,7 +181,7 @@ int main() {
         return 1;
     }
 
-    if (!deinit<int>(resources)) {
+    if (!deinit(resources)) {
         std::cout << "Deinitialization failed. Exiting." << std::endl;       
         return 1;
     }
