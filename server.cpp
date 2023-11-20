@@ -125,53 +125,56 @@ bool deinit(SharedResources &resources){
 
 bool process_requests(SharedResources &resources){
     uint key = 0, read_val = 0, actual_object_size = 0;
-    int ret = 0, command = -2;
+    int ret = 0;
     RequestMessage req_msg; // TODO guy move this into the while loop
+    CommandType command = CommandType::NONE;
 
-    while (command != -1) {
+    while (command != CommandType::EXIT) {
         ResponseMessage res_msg;
         while (!resources.submission_queue->pop(req_msg)); // Busy-wait for a value to be available
         command = req_msg.cmd;
         res_msg.request_id = req_msg.request_id;
 
-            if (req_msg.cmd == EXIT){
-                res_msg.answer = ANSWER_EXIT;
+            if (req_msg.cmd == CommandType::EXIT){
+                res_msg.answer = AnswerType::EXIT;
             }
-            else if (req_msg.cmd == WRITE)
+            else if (req_msg.cmd == CommandType::WRITE)
             {
                 std::cout << "Received: " << req_msg.data << std::endl;
                 std::cout << req_msg.request_id << ": Calling PLIOPS_Put! Value: "  << req_msg.data << std::endl;
                 ret = PLIOPS_Put(resources.plio_handle, &req_msg.key, sizeof(req_msg.key), &req_msg.data, sizeof(req_msg.data), NO_OPTIONS); //TODO guy look into options
                 if (ret != 0) {
                     printf("PLIOPS_Put Failed ret=%d\n", ret);
-                    // TODO guy - res_msg.answer = FAIL;
-                    return false;
+                    res_msg.answer = AnswerType::FAIL;
+                    res_msg.error = ret;
                 }
                 else
-                    res_msg.answer = SUCCESS; // TODO guy - res_msg.answer = SUCCESS;
+                    res_msg.answer = AnswerType::SUCCESS; // TODO guy - res_msg.answer = SUCCESS;
                 std::cout << "Finished PLIOPS_Put!" << std::endl; 
             }
-            else if (req_msg.cmd == READ)
+            else if (req_msg.cmd == CommandType::READ)
             {
                 std::cout << "Calling PLIOPS_Get!" << std::endl;
                 ret = PLIOPS_Get(resources.plio_handle, &req_msg.key, sizeof(req_msg.key), &res_msg.data, sizeof(res_msg.data), &actual_object_size);
                 if (ret != 0) {
                     printf("PLIOPS_Get Failed ret=%d\n", ret);
-                    // TODO guy - res_msg.answer = FAIL;
-                    return false;
+                    res_msg.answer = AnswerType::FAIL;
+                    res_msg.error = ret;
                 }
                 else
-                    res_msg.answer = SUCCESS; // TODO guy - res_msg.answer = SUCCESS;
+                    res_msg.answer = AnswerType::SUCCESS; // TODO guy - res_msg.answer = SUCCESS;
                 std::cout << "Finished PLIOPS_Get!" << std::endl; 
-                std::cout << req_msg.request_id << ": Called PLIOPS_Get! Value: " << req_msg.data << std::endl;
+                std::cout << req_msg.request_id << ": Called PLIOPS_Get! Value: " << res_msg.data << std::endl;
             }
             else
             {
-                std::cout << "Cannot perform command " << req_msg.cmd << std::endl;
+                std::cout << "Cannot perform command " << (int)req_msg.cmd << std::endl;
+                res_msg.answer = AnswerType::FAIL;
+                //TODO add: res_msg.error = ???;
             }
 
         while (!resources.completion_queue->push(res_msg)); // Busy-wait until the value is pushed successfully
-        std::cout << "Server sent confirmation message with the answer: " << res_msg.answer << std::endl;
+        std::cout << "Server sent confirmation message with the answer: " << (int)res_msg.answer << std::endl;
 
     }
     return true;

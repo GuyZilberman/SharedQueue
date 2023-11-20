@@ -8,14 +8,16 @@ const int QUEUE_SIZE = 3;
 
 //https://chat.openai.com/c/1014224d-4eb5-45ae-9862-a60a3b162a88
 
-enum CommandType { //TODO change to scoped enumeration https://chat.openai.com/c/90b7f6bd-14f9-4b5e-baa7-48823eae3dcf
-    EXIT = -1,
+enum class CommandType { //TODO change to scoped enumeration https://chat.openai.com/c/90b7f6bd-14f9-4b5e-baa7-48823eae3dcf
+    NONE = -2,
+    EXIT,
     WRITE,
     READ
 };
 
-enum AnswerType { //TODO change to scoped enumeration https://chat.openai.com/c/90b7f6bd-14f9-4b5e-baa7-48823eae3dcf
-    ANSWER_EXIT = -1,
+enum class AnswerType { //TODO change to scoped enumeration https://chat.openai.com/c/90b7f6bd-14f9-4b5e-baa7-48823eae3dcf
+    NONE = -2,
+    EXIT,
     SUCCESS,
     FAIL
 };
