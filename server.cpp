@@ -134,10 +134,12 @@ bool process_requests(SharedResources &resources){
         command = req_msg.cmd;
         res_msg.request_id = req_msg.request_id;
 
-        if (req_msg.cmd != EXIT){
-            std::cout << "Received: " << req_msg.data << std::endl;
-            if (req_msg.cmd == WRITE)
+            if (req_msg.cmd == EXIT){
+                res_msg.answer = ANSWER_EXIT;
+            }
+            else if (req_msg.cmd == WRITE)
             {
+                std::cout << "Received: " << req_msg.data << std::endl;
                 std::cout << req_msg.request_id << ": Calling PLIOPS_Put! Value: "  << req_msg.data << std::endl;
                 ret = PLIOPS_Put(resources.plio_handle, &req_msg.key, sizeof(req_msg.key), &req_msg.data, sizeof(req_msg.data), NO_OPTIONS); //TODO guy look into options
                 if (ret != 0) {
@@ -167,10 +169,6 @@ bool process_requests(SharedResources &resources){
             {
                 std::cout << "Cannot perform command " << req_msg.cmd << std::endl;
             }
-        }
-        else{
-            res_msg.answer = ANSWER_EXIT;
-        }
 
         while (!resources.completion_queue->push(res_msg)); // Busy-wait until the value is pushed successfully
         std::cout << "Server sent confirmation message with the answer: " << res_msg.answer << std::endl;
