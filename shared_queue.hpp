@@ -16,7 +16,7 @@ enum CommandType { //TODO change to scoped enumeration https://chat.openai.com/c
 
 enum AnswerType { //TODO change to scoped enumeration https://chat.openai.com/c/90b7f6bd-14f9-4b5e-baa7-48823eae3dcf
     ANSWER_EXIT = -1,
-    SUCESS,
+    SUCCESS,
     FAIL
 };
 
@@ -29,7 +29,8 @@ struct RequestMessage {
 
 struct ResponseMessage {
 	uint request_id;
-	uint answer; //TODO guy change to AnswerType
+	AnswerType answer;
+    int error;
 	uint data;
 };
 

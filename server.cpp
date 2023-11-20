@@ -146,7 +146,7 @@ bool process_requests(SharedResources &resources){
                     return false;
                 }
                 else
-                    res_msg.answer = 0; // TODO guy - res_msg.answer = SUCCESS;
+                    res_msg.answer = SUCCESS; // TODO guy - res_msg.answer = SUCCESS;
                 std::cout << "Finished PLIOPS_Put!" << std::endl; 
             }
             else if (req_msg.cmd == READ)
@@ -159,7 +159,7 @@ bool process_requests(SharedResources &resources){
                     return false;
                 }
                 else
-                    res_msg.answer = 0; // TODO guy - res_msg.answer = SUCCESS;
+                    res_msg.answer = SUCCESS; // TODO guy - res_msg.answer = SUCCESS;
                 std::cout << "Finished PLIOPS_Get!" << std::endl; 
                 std::cout << req_msg.request_id << ": Called PLIOPS_Get! Value: " << req_msg.data << std::endl;
             }
@@ -169,7 +169,7 @@ bool process_requests(SharedResources &resources){
             }
         }
         else{
-            res_msg.answer = -1;
+            res_msg.answer = ANSWER_EXIT;
         }
 
         while (!resources.completion_queue->push(res_msg)); // Busy-wait until the value is pushed successfully
