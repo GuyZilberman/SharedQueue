@@ -10,7 +10,7 @@
 
 struct SharedResources {
     LockFreeQueue<RequestMessage> *submission_queue;
-    LockFreeQueue<int> *completion_queue;
+    LockFreeQueue<ResponseMessage> *completion_queue;
     int submission_shm_fd;
     int completion_shm_fd;
     PLIOPS_DB_t plio_handle;
@@ -73,7 +73,7 @@ bool setup_queue(SharedResources &resources, const char* name) {
 
 bool init(SharedResources &resources){
     setup_queue<RequestMessage>(resources, SUBMISSION_QUEUE_NAME);
-    setup_queue<int>(resources, COMPLETION_QUEUE_NAME);
+    setup_queue<ResponseMessage>(resources, COMPLETION_QUEUE_NAME);
 
     // Start of storelib init
     resources.identify = 0; //TODO guy check if I need a better identifier
@@ -116,7 +116,7 @@ bool deinit(SharedResources &resources){
     close(resources.submission_shm_fd);
     shm_unlink(SUBMISSION_QUEUE_NAME);
 
-    munmap(resources.completion_queue, sizeof(LockFreeQueue<int>));
+    munmap(resources.completion_queue, sizeof(LockFreeQueue<ResponseMessage>));
     close(resources.completion_shm_fd);
     shm_unlink(COMPLETION_QUEUE_NAME);
 
@@ -126,11 +126,13 @@ bool deinit(SharedResources &resources){
 bool process_requests(SharedResources &resources){
     uint key = 0, read_val = 0, actual_object_size = 0;
     int ret = 0, command = -2;
-    RequestMessage req_msg;
+    RequestMessage req_msg; // TODO guy move this into the while loop
 
     while (command != -1) {
+        ResponseMessage res_msg;
         while (!resources.submission_queue->pop(req_msg)); // Busy-wait for a value to be available
         command = req_msg.cmd;
+        res_msg.request_id = req_msg.request_id;
 
         if (req_msg.cmd != EXIT){
             std::cout << "Received: " << req_msg.data << std::endl;
@@ -140,18 +142,24 @@ bool process_requests(SharedResources &resources){
                 ret = PLIOPS_Put(resources.plio_handle, &req_msg.key, sizeof(req_msg.key), &req_msg.data, sizeof(req_msg.data), NO_OPTIONS); //TODO guy look into options
                 if (ret != 0) {
                     printf("PLIOPS_Put Failed ret=%d\n", ret);
+                    // TODO guy - res_msg.answer = FAIL;
                     return false;
                 }
+                else
+                    res_msg.answer = 0; // TODO guy - res_msg.answer = SUCCESS;
                 std::cout << "Finished PLIOPS_Put!" << std::endl; 
             }
             else if (req_msg.cmd == READ)
             {
                 std::cout << "Calling PLIOPS_Get!" << std::endl;
-                ret = PLIOPS_Get(resources.plio_handle, &req_msg.key, sizeof(req_msg.key), &req_msg.data, sizeof(req_msg.data), &actual_object_size);
+                ret = PLIOPS_Get(resources.plio_handle, &req_msg.key, sizeof(req_msg.key), &res_msg.data, sizeof(res_msg.data), &actual_object_size);
                 if (ret != 0) {
                     printf("PLIOPS_Get Failed ret=%d\n", ret);
+                    // TODO guy - res_msg.answer = FAIL;
                     return false;
                 }
+                else
+                    res_msg.answer = 0; // TODO guy - res_msg.answer = SUCCESS;
                 std::cout << "Finished PLIOPS_Get!" << std::endl; 
                 std::cout << req_msg.request_id << ": Called PLIOPS_Get! Value: " << req_msg.data << std::endl;
             }
@@ -160,9 +168,12 @@ bool process_requests(SharedResources &resources){
                 std::cout << "Cannot perform command " << req_msg.cmd << std::endl;
             }
         }
+        else{
+            res_msg.answer = -1;
+        }
 
-        while (!resources.completion_queue->push(req_msg.cmd)); // Busy-wait until the value is pushed successfully
-        std::cout << "Server sent confirmation for the following command: " << req_msg.cmd << std::endl;
+        while (!resources.completion_queue->push(res_msg)); // Busy-wait until the value is pushed successfully
+        std::cout << "Server sent confirmation message with the answer: " << res_msg.answer << std::endl;
 
     }
     return true;

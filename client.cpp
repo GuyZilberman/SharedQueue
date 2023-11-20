@@ -7,13 +7,15 @@
 
 void pop_from_completion_queue() {
     int cq_shm_fd = shm_open(COMPLETION_QUEUE_NAME, O_RDWR, 0666);
-    LockFreeQueue<int> *completion_queue = static_cast<LockFreeQueue<int>*>(mmap(0, sizeof(LockFreeQueue<int>), PROT_READ | PROT_WRITE, MAP_SHARED, cq_shm_fd, 0));
-    int command = 0;
+    LockFreeQueue<ResponseMessage> *completion_queue = static_cast<LockFreeQueue<ResponseMessage>*>(mmap(0, sizeof(LockFreeQueue<ResponseMessage>), PROT_READ | PROT_WRITE, MAP_SHARED, cq_shm_fd, 0));
+    int answer = -2;
 
-    while (command != -1) {
-        while (!completion_queue->pop(command)); // Busy-wait for a command to be available
+    while (answer != -1) {
+        ResponseMessage res_msg;
+        while (!completion_queue->pop(res_msg)); // Busy-wait for a command to be available
         // TODO guy check about this: Optional: backoff strategy to reduce CPU usage
-        std::cout << "Client: Received from completion queue: " << command << std::endl;
+        answer = res_msg.answer;
+        std::cout << "Client: Received from completion queue: " << answer << std::endl;
 
     }
     munmap(completion_queue, sizeof(LockFreeQueue<int>));
