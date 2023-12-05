@@ -51,7 +51,7 @@ bool setup_queue(SharedResources &resources, const char* name) {
         shm_fd_ptr = &resources.completion_shm_fd;
         queue_ptr = (LockFreeQueue<T>**)&resources.completion_queue;
     } else {
-        std::cerr << "Wrong name" << std::endl; // Improved error message
+        std::cerr << "Wrong name" << std::endl; // TODO guy improve error message
         return false;
     }
     
@@ -140,8 +140,8 @@ bool process_requests(SharedResources &resources){
             }
             else if (req_msg.cmd == CommandType::WRITE)
             {
-                std::cout << "Received: " << req_msg.data << std::endl;
-                std::cout << req_msg.request_id << ": Calling PLIOPS_Put! Value: "  << req_msg.data << std::endl;
+                std::cout << "Received: " << req_msg.data[0] << std::endl;
+                std::cout << req_msg.request_id << ": Calling PLIOPS_Put! Value: "  << req_msg.data[0] << std::endl;
                 ret = PLIOPS_Put(resources.plio_handle, &req_msg.key, sizeof(req_msg.key), &req_msg.data, sizeof(req_msg.data), NO_OPTIONS); //TODO guy look into options
                 if (ret != 0) {
                     printf("PLIOPS_Put Failed ret=%d\n", ret);
@@ -164,7 +164,7 @@ bool process_requests(SharedResources &resources){
                 else
                     res_msg.answer = AnswerType::SUCCESS; // TODO guy - res_msg.answer = SUCCESS;
                 std::cout << "Finished PLIOPS_Get!" << std::endl; 
-                std::cout << req_msg.request_id << ": Called PLIOPS_Get! Value: " << res_msg.data << std::endl;
+                std::cout << req_msg.request_id << ": Called PLIOPS_Get! Value: " << res_msg.data[0] << std::endl;
             }
             else
             {

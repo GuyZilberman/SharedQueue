@@ -1,21 +1,22 @@
 #include <atomic>
 #include <iostream>
+#include <vector>
 
 #define SUBMISSION_QUEUE_NAME "/submission_queue"
 #define COMPLETION_QUEUE_NAME "/completion_queue"
 
-const int QUEUE_SIZE = 3;
+const int QUEUE_SIZE = 10000000;
 
 //https://chat.openai.com/c/1014224d-4eb5-45ae-9862-a60a3b162a88
 
-enum class CommandType { //TODO change to scoped enumeration https://chat.openai.com/c/90b7f6bd-14f9-4b5e-baa7-48823eae3dcf
+enum class CommandType {
     NONE = -2,
     EXIT,
     WRITE,
     READ
 };
 
-enum class AnswerType { //TODO change to scoped enumeration https://chat.openai.com/c/90b7f6bd-14f9-4b5e-baa7-48823eae3dcf
+enum class AnswerType {
     NONE = -2,
     EXIT,
     SUCCESS,
@@ -26,14 +27,14 @@ struct RequestMessage {
 	uint request_id;
 	CommandType cmd;
 	uint key;
-	uint data;
+	int data[256];
 };
 
 struct ResponseMessage {
 	uint request_id;
 	AnswerType answer;
     int error;
-	uint data;
+	int data[256];
 };
 
 template<typename T>

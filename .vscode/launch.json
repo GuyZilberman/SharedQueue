@@ -20,7 +20,7 @@
             "setupCommands": [
                 {
                     "description": "Enable pretty-printing for gdb",
-                    "text": "-enabley-pretty-printing",
+                    "text": "-enabley-pretty-printing", //TODO go fix to enable (instead of enabley)
                     "ignoreFailures": true
                 },
                 {
