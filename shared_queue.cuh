@@ -1,11 +1,12 @@
 #include <atomic>
 #include <iostream>
 #include <vector>
+//#include <cuda/atomic>
 
 #define SUBMISSION_QUEUE_NAME "/submission_queue"
 #define COMPLETION_QUEUE_NAME "/completion_queue"
 
-const int QUEUE_SIZE = 10000000;
+const int QUEUE_SIZE = 3;
 
 //https://chat.openai.com/c/1014224d-4eb5-45ae-9862-a60a3b162a88
 

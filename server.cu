@@ -1,7 +1,7 @@
 #include <fcntl.h>
 #include <sys/mman.h>
 #include <unistd.h>
-#include "shared_queue.hpp"
+#include "shared_queue.cuh"
 #include "/etc/pliops/store_lib_expo.h"
 #include <cstring>
 
@@ -124,7 +124,7 @@ bool deinit(SharedResources &resources){
 }
 
 bool process_requests(SharedResources &resources){
-    uint key = 0, read_val = 0, actual_object_size = 0;
+    uint actual_object_size = 0;
     int ret = 0;
     RequestMessage req_msg; // TODO guy move this into the while loop
     CommandType command = CommandType::NONE;

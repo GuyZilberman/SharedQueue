@@ -1,13 +1,13 @@
 #include <fcntl.h>
 #include <sys/mman.h>
 #include <unistd.h>
-#include "shared_queue.hpp"
+#include "shared_queue.cuh"
 #include <thread>
 #include <random>
 #include <vector>
 #include <algorithm>
 
-#define NUM_ITERATIONS 1000000
+#define NUM_ITERATIONS 10
 #define READ_START_ID NUM_ITERATIONS
 #define READ_END_ID 2*NUM_ITERATIONS-1
 
@@ -59,7 +59,6 @@ void completion_queue_thread_func() {
 void submission_queue_thread_func(int num_iterations, int value_size) {
     int sq_shm_fd = shm_open(SUBMISSION_QUEUE_NAME, O_RDWR, 0666);
     LockFreeQueue<RequestMessage> *submission_queue = static_cast<LockFreeQueue<RequestMessage>*>(mmap(0, sizeof(LockFreeQueue<RequestMessage>), PROT_READ | PROT_WRITE, MAP_SHARED, sq_shm_fd, 0));
-    int command;
     uint idx = 0, request_id = 0;
 
     
