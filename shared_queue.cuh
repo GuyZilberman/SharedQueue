@@ -1,7 +1,7 @@
 #include <atomic>
 #include <iostream>
 #include <vector>
-//#include <cuda/atomic>
+#include <cuda/atomic>
 
 #define SUBMISSION_QUEUE_NAME "/submission_queue"
 #define COMPLETION_QUEUE_NAME "/completion_queue"
@@ -41,30 +41,32 @@ struct ResponseMessage {
 template<typename T>
 class LockFreeQueue {
 private:
-    std::atomic<int> head;
-    std::atomic<int> tail;
+    cuda::atomic<int> head;
+    cuda::atomic<int> tail;
     T data[QUEUE_SIZE];
 
 public:
     LockFreeQueue() : head(0), tail(0) {}
 
+    __host__ __device__ 
     bool push(T val) {
-        int currTail = tail.load(); // TODO guy CS AFTER
-        if ((currTail + 1) % QUEUE_SIZE == head.load()) {
+        int currTail = tail.load(cuda::memory_order_relaxed); // TODO guy CS AFTER
+        if ((currTail + 1) % QUEUE_SIZE == head.load(cuda::memory_order_acquire)) {
             return false; // Queue full
         }
         data[currTail] = val;
-        tail.store((currTail + 1) % QUEUE_SIZE);
+        tail.store((currTail + 1) % QUEUE_SIZE, cuda::memory_order_release);
         return true;
     }
 
+    __host__ __device__ 
     bool pop(T &val) {
-        int currHead = head.load(); //TODO guy CS AFTER?
-        if (currHead == tail.load()) {
+        int currHead = head.load(cuda::memory_order_relaxed); //TODO guy CS AFTER?
+        if (currHead == tail.load(cuda::memory_order_acquire)) {
             return false; // Queue empty
         }
         val = data[currHead];
-        head.store((currHead + 1) % QUEUE_SIZE);
+        head.store((currHead + 1) % QUEUE_SIZE, cuda::memory_order_release);
         return true;
     }
 };

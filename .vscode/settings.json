@@ -43,6 +43,13 @@
         "ctime": "cpp",
         "chrono": "cpp",
         "ratio": "cpp",
-        "cstring": "cpp"
+        "cstring": "cpp",
+        "functional": "cpp",
+        "iterator": "cpp",
+        "numeric": "cpp",
+        "random": "cpp",
+        "cinttypes": "cpp",
+        "bit": "cpp",
+        "__verbose_abort": "cpp"
     }
 }

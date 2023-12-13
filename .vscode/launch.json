@@ -5,6 +5,19 @@
     "version": "0.2.0",
     "configurations": [
         {
+            "name": "CUDA C++: Launch",
+            "type": "cuda-gdb",
+            "request": "launch",
+            "cwd": "${workspaceFolder}",
+            "program": "${workspaceFolder}/ucf",
+            "environment": [
+                {
+                    "name": "LD_LIBRARY_PATH",
+                    "value": "/etc/pliops:/usr/local/cuda-12.3/lib64:/etc/pliops:/usr/local/cuda-12.3/lib64"
+                }
+            ],
+        },
+        {
             "name": "Debug Server process",
             "type": "cppdbg",
             "request": "launch",
