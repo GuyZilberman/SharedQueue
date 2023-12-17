@@ -35,59 +35,46 @@ using namespace std;
 
 #include "gdrapi.h"
 #include "gdrcopy_common.hpp"
+#include <cuda/atomic>
 
 using namespace gdrcopy::test;
 
-void pp_cpu_thread(gdr_mh_t mh, uint32_t *d_buf, uint32_t *h_buf, uint32_t num_iters){
-        uint32_t i = 1;
-        // Wait for pp_kernel to be ready before starting the time measurement.
-        while (READ_ONCE(*h_buf) != i);
+void pp_cpu_thread(gdr_mh_t mh, uint32_t *d_buf, uint32_t num_iters){
+        uint32_t i = 1, wval = 1, rval = 0;
         LB();
 
-        // Restart the timer for measurement.
         while (i < num_iters) {
-            gdr_copy_to_mapping(mh, d_buf, &i, sizeof(d_buf));
+            gdr_copy_to_mapping(mh, d_buf, &wval, sizeof(d_buf));
             SB();
 
             ++i;
 
-            while (READ_ONCE(*h_buf) != i);
+            while (READ_ONCE(*d_buf) != rval);
             LB();
+            printf("CPU: pp_cpu_thread: Finished iteration %d\n", i);
         }
 }
 
-__global__ void pp_kernel(uint32_t *d_buf, uint32_t *h_buf, uint32_t num_iters)
+__global__ 
+void pp_kernel(uint32_t *d_buf, uint32_t num_iters)
 {
-    uint32_t i = 1;
-    WRITE_ONCE(*h_buf, i);
+    uint32_t i = 1, rval = 1, wval = 0;;
     __threadfence_block();
     while (i < num_iters) {
-        while (READ_ONCE(*d_buf) != i) ;
+        while (READ_ONCE(*d_buf) != rval) ;
         __threadfence_block();
 
         ++i;
-        WRITE_ONCE(*h_buf, i);
+        WRITE_ONCE(*d_buf, wval);
         __threadfence_block();
+        printf("GPU: pp_kernel: Finished iteration %d\n", i);
     }
 }
 
 static int dev_id = 0;
 static uint32_t num_iters = 5;
 
-int main(int argc, char *argv[])
-{
-    uint32_t *d_buf = NULL;
-    uint32_t *h_buf = NULL;
-
-    CUdeviceptr d_buf_cuptr;
-    CUdeviceptr h_buf_cuptr;
-
-    gpu_mem_handle_t mhandle;
-
-    // GUY: Initialize the CUDA driver API
-    ASSERTDRV(cuInit(0));
-
-    // GUY: Start of device selection stuff
+void cuda_select_device(){
     int n_devices = 0;
     ASSERTDRV(cuDeviceGetCount(&n_devices));
 
@@ -123,19 +110,27 @@ int main(int argc, char *argv[])
 
     // Check that the device supports GDR
     ASSERT_EQ(check_gdr_support(dev), true);
-    // GUY: End of device selection stuff
+}
+
+int main(int argc, char *argv[])
+{
+    uint32_t *d_buf = NULL; //cuda::atomic<int> *d_buf = NULL;
+
+    CUdeviceptr d_buf_cuptr;
+
+    gpu_mem_handle_t mhandle;
+
+    // GUY: Initialize the CUDA driver API
+    ASSERTDRV(cuInit(0));
+
+    cuda_select_device();
 
     ASSERTDRV(gpu_mem_alloc(&mhandle, sizeof(*d_buf), true, true));
     d_buf_cuptr = mhandle.ptr;
     cout << "device ptr: 0x" << hex << d_buf_cuptr << dec << endl;
 
     // set d_buf_cuptr's value to 0
-    ASSERTDRV(cuMemsetD8(d_buf_cuptr, 0, sizeof(*d_buf)));
-
-    ASSERTDRV(cuMemHostAlloc((void **)&h_buf, sizeof(*h_buf), CU_MEMHOSTALLOC_PORTABLE | CU_MEMHOSTALLOC_DEVICEMAP));
-    ASSERT_NEQ(h_buf, (void*)0);
-    ASSERTDRV(cuMemHostGetDevicePointer(&h_buf_cuptr, h_buf, 0));
-    memset(h_buf, 0, sizeof(*h_buf));
+    ASSERTDRV(cuMemsetD8(d_buf_cuptr, 2, sizeof(*d_buf)));
 
     // called to open a handle to the GPUDirect RDMA driver
     gdr_t g = gdr_open_safe();
@@ -171,7 +166,7 @@ int main(int argc, char *argv[])
         cout << "CPU does gdr_copy_to_mapping and GPU writes back via cuMemHostAlloc'd buffer." << endl;
         cout << "Running " << num_iters << " iterations with data size " << sizeof(*d_buf) << " bytes." << endl;
 
-        pp_kernel<<< 1, 1 >>>((uint32_t *)d_buf_cuptr, (uint32_t *)h_buf_cuptr, num_iters);
+        pp_kernel<<< 1, 1 >>>((uint32_t *)d_buf_cuptr, num_iters);
 
         // Catching any potential errors. CUDA_ERROR_NOT_READY means pp_kernel
         // is running. We expect to see this status instead of CUDA_SUCCESS
@@ -180,7 +175,7 @@ int main(int argc, char *argv[])
         ASSERT_EQ(cuStreamQuery(0), CUDA_ERROR_NOT_READY);
 
         // Launch a server thread
-        std::thread server_thread(pp_cpu_thread, mh, d_buf, h_buf, num_iters);
+        std::thread server_thread(pp_cpu_thread, mh, d_buf, num_iters);
         server_thread.detach();
 
         ASSERTDRV(cuStreamSynchronize(0));
@@ -195,7 +190,6 @@ int main(int argc, char *argv[])
     cout << "closing gdrdrv" << endl;
     ASSERT_EQ(gdr_close(g), 0);
 
-    ASSERTDRV(cuMemFreeHost(h_buf));
     ASSERTDRV(gpu_mem_free(&mhandle));
 
     return 0;
