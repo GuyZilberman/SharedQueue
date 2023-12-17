@@ -2,6 +2,7 @@
 #include "shared_queue.cuh"
 #include "/etc/pliops/store_lib_expo.h"
 #include <random>
+#include "gdrcopy_common.hpp"
 
 #define NO_OPTIONS 0
 #define NUM_ITERATIONS QUEUE_SIZE
@@ -10,6 +11,7 @@
 
 #define GPU_TURN 0
 #define CPU_TURN 1
+using namespace gdrcopy::test;
 
 __global__
 void GPU_thread(cuda::atomic<int>* flag) {
@@ -58,5 +60,9 @@ int main() {
 
 
 	cudaFreeHost(p_flag);
+
+#if CUDA_VERSION >= 11000
+    printf ("My CUDA version is new!\n"); //TODO guy DELETE
+#endif
     return 0;
 }

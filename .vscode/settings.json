@@ -50,6 +50,11 @@
         "random": "cpp",
         "cinttypes": "cpp",
         "bit": "cpp",
-        "__verbose_abort": "cpp"
+        "__verbose_abort": "cpp",
+        "iomanip": "cpp",
+        "condition_variable": "cpp",
+        "map": "cpp",
+        "set": "cpp",
+        "mutex": "cpp"
     }
 }

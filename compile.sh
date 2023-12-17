@@ -24,16 +24,16 @@
 # fi
 
 # Compile ucf
-echo "Compiling unified_client_server (ucf)..."
-nvcc unified_client_server.cu -o ucf -lrt -lpthread -I/etc/pliops -L/etc/pliops -lstorelib -g -G -arch=sm_80 
+# echo "Compiling unified_client_server (ucf)..."
+# nvcc unified_client_server.cu -o ucf -lrt -lpthread -I/etc/pliops -L/etc/pliops -lstorelib -g -G -arch=sm_80
 
-# Check if server compilation was successful
-if [ $? -eq 0 ]; then
-    echo "ucf compiled successfully."
-else
-    echo "ucf compilation failed."
-    exit 1
-fi
+# # Check if server compilation was successful
+# if [ $? -eq 0 ]; then
+#     echo "ucf compiled successfully."
+# else
+#     echo "ucf compilation failed."
+#     exit 1
+# fi
 
 # Compile two_streams
 # echo "Compiling two_streams..."
@@ -46,3 +46,27 @@ fi
 #     echo "two_streams compilation failed."
 #     exit 1
 # fi
+
+# Compile gdrcopy_poc
+# echo "Compiling gdrcopy_poc..."
+# nvcc gdrcopy_poc.cu gdrcopy_common.cpp -o gdrcopy_poc -lrt -lpthread -I/etc/pliops -L/etc/pliops -lstorelib -g -G -arch=sm_80 -lcuda -lgdrapi
+
+# # Check if server compilation was successful
+# if [ $? -eq 0 ]; then
+#     echo "gdrcopy_poc compiled successfully."
+# else
+#     echo "gdrcopy_poc compilation failed."
+#     exit 1
+# fi
+
+# Compile gdrcopy_pplat
+echo "Compiling gdrcopy_pplat..."
+nvcc gdrcopy_pplat.cu gdrcopy_common.cpp -o gdrcopy_pplat -lrt -lpthread -I/etc/pliops -L/etc/pliops -lstorelib -g -G -arch=sm_80 -lcuda -lgdrapi
+
+# Check if server compilation was successful
+if [ $? -eq 0 ]; then
+    echo "gdrcopy_pplat compiled successfully."
+else
+    echo "gdrcopy_pplat compilation failed."
+    exit 1
+fi

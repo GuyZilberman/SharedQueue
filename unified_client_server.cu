@@ -1,7 +1,7 @@
 #include "common.cuh"
 #include "shared_queue.cuh"
 #include "/etc/pliops/store_lib_expo.h"
-#include <random>
+//#include <cuda.h>
 
 #define NO_OPTIONS 0
 #define NUM_ITERATIONS QUEUE_SIZE
@@ -215,5 +215,8 @@ int main() {
         return 1;
     }
 
+#if CUDA_VERSION >= 11000
+    printf ("My CUDA version is new!\n"); //TODO guy DELETE
+#endif
     return 0;
 }
