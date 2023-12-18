@@ -23,18 +23,6 @@
 #     echo "Client compilation failed."
 # fi
 
-# Compile ucf
-# echo "Compiling unified_client_server (ucf)..."
-# nvcc unified_client_server.cu -o ucf -lrt -lpthread -I/etc/pliops -L/etc/pliops -lstorelib -g -G -arch=sm_80
-
-# # Check if server compilation was successful
-# if [ $? -eq 0 ]; then
-#     echo "ucf compiled successfully."
-# else
-#     echo "ucf compilation failed."
-#     exit 1
-# fi
-
 # Compile two_streams
 # echo "Compiling two_streams..."
 # nvcc two_streams.cu -o two_streams -lrt -lpthread -I/etc/pliops -L/etc/pliops -lstorelib -g -G -arch=sm_80 
@@ -70,3 +58,15 @@ else
     echo "gdrcopy_pplat compilation failed."
     exit 1
 fi
+
+# Compile ucf
+# echo "Compiling unified_client_server (ucf)..."
+# nvcc unified_client_server.cu -o ucf -lrt -lpthread -I/etc/pliops -L/etc/pliops -lstorelib -g -G -arch=sm_80
+
+# # Check if server compilation was successful
+# if [ $? -eq 0 ]; then
+#     echo "ucf compiled successfully."
+# else
+#     echo "ucf compilation failed."
+#     exit 1
+# fi
