@@ -39,34 +39,50 @@ using namespace std;
 
 using namespace gdrcopy::test;
 
-void pp_cpu_thread(gdr_mh_t mh, uint32_t *d_buf, uint32_t num_iters){
+class DummyClass{
+private:
+    int age;
+public:
+    cuda::atomic<int> id;
+    int getAge(){
+        return age;
+    }
+    void setAge(int age){
+        this->age = age;
+    }
+};
+
+void pp_cpu_thread(gdr_mh_t mh, DummyClass *d_buf, uint32_t num_iters){ // TODO guy !:!
         uint32_t i = 1, wval = 1, rval = 0;
-        LB();
+        //LB(); //TODO guy !:!
 
         while (i < num_iters) {
-            gdr_copy_to_mapping(mh, d_buf, &wval, sizeof(d_buf));
-            SB();
-
+            //gdr_copy_to_mapping(mh, &(d_buf->id), &wval, sizeof(&(d_buf->id))); // TODO guy !:!
+            //SB(); //TODO guy !:!
+            d_buf->id.store(wval);
             ++i;
 
-            while (READ_ONCE(*d_buf) != rval);
-            LB();
+            //while (READ_ONCE(d_buf->id) != rval); // TODO guy !:!
+            while (d_buf->id.load() != rval); // TODO guy !:!
+            //LB(); //TODO guy !:!
             printf("CPU: pp_cpu_thread: Finished iteration %d\n", i);
         }
 }
 
 __global__ 
-void pp_kernel(uint32_t *d_buf, uint32_t num_iters)
+void pp_kernel(DummyClass *d_buf, uint32_t num_iters) // TODO guy !:!
 {
     uint32_t i = 1, rval = 1, wval = 0;;
-    __threadfence_block();
+    //__threadfence_block(); //TODO guy !:!
     while (i < num_iters) {
-        while (READ_ONCE(*d_buf) != rval) ;
-        __threadfence_block();
+        //while (READ_ONCE(d_buf->id) != rval) ; //TODO guy !:!
+        while (d_buf->id.load() != rval);
+        //__threadfence_block(); //TODO guy !:!
 
         ++i;
-        WRITE_ONCE(*d_buf, wval);
-        __threadfence_block();
+        //WRITE_ONCE(d_buf->id, wval); //TODO guy !:!
+        d_buf->id.store(wval);
+        //__threadfence_block(); //TODO guy !:!
         printf("GPU: pp_kernel: Finished iteration %d\n", i);
     }
 }
@@ -114,7 +130,7 @@ void cuda_select_device(){
 
 int main(int argc, char *argv[])
 {
-    uint32_t *d_buf = NULL; //cuda::atomic<int> *d_buf = NULL;
+    DummyClass *d_buf = NULL; // TODO guy !:!
 
     CUdeviceptr d_buf_cuptr;
 
@@ -130,7 +146,7 @@ int main(int argc, char *argv[])
     cout << "device ptr: 0x" << hex << d_buf_cuptr << dec << endl;
 
     // set d_buf_cuptr's value to 0
-    ASSERTDRV(cuMemsetD8(d_buf_cuptr, 2, sizeof(*d_buf)));
+    //ASSERTDRV(cuMemsetD8(d_buf_cuptr, 2, sizeof(*d_buf))); //TODO guy !:!
 
     // called to open a handle to the GPUDirect RDMA driver
     gdr_t g = gdr_open_safe();
@@ -160,13 +176,13 @@ int main(int argc, char *argv[])
         int off = info.va - d_buf_cuptr;
         cout << "page offset: " << off << endl;
 
-        d_buf = (uint32_t *)((uintptr_t)map_d_ptr + off);
+        d_buf = (DummyClass *)((uintptr_t)map_d_ptr + off);
         cout << "user-space pointer: " << d_buf << endl;
 
         cout << "CPU does gdr_copy_to_mapping and GPU writes back via cuMemHostAlloc'd buffer." << endl;
         cout << "Running " << num_iters << " iterations with data size " << sizeof(*d_buf) << " bytes." << endl;
 
-        pp_kernel<<< 1, 1 >>>((uint32_t *)d_buf_cuptr, num_iters);
+        pp_kernel<<< 1, 1 >>>((DummyClass *)d_buf_cuptr, num_iters); //TODO guy !:!
 
         // Catching any potential errors. CUDA_ERROR_NOT_READY means pp_kernel
         // is running. We expect to see this status instead of CUDA_SUCCESS
