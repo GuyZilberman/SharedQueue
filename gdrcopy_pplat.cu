@@ -39,9 +39,6 @@ using namespace std;
 
 using namespace gdrcopy::test;
 
-static int dev_id = 0;
-static uint32_t num_iters = 5;
-
 class DummyClass{
 private:
     int age;
@@ -57,7 +54,7 @@ public:
 
 class GPUMemoryManager{
     private:
-        void cuda_select_device(){
+        void cuda_select_device(int dev_id = 0){
             int n_devices = 0;
             ASSERTDRV(cuDeviceGetCount(&n_devices));
 
@@ -220,6 +217,7 @@ int main(int argc, char *argv[])
     cudaGPUMemAlloc<DummyClass>(gpu_mm, &d_buf, d_buf_cuptr);
 
     BEGIN_CHECK {
+        uint32_t num_iters = 5;
         pp_kernel<<<1, 1>>>((DummyClass *)d_buf_cuptr, num_iters);
 
         // CUDA_ERROR_NOT_READY means pp_kernel is running. We expect to see this
