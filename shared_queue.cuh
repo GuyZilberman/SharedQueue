@@ -28,7 +28,7 @@ struct RequestMessage {
 	uint request_id;
 	CommandType cmd;
 	uint key;
-	int data[256];
+	int data[256]; //TODO GUY 253
 };
 
 struct ResponseMessage {
@@ -49,7 +49,7 @@ public:
     LockFreeQueue() : head(0), tail(0) {}
 
     __host__ __device__ 
-    bool push(T val) {
+    bool push(const T &val) { //TODO guy compile and check
         int currTail = tail.load(cuda::memory_order_relaxed); // TODO guy CS AFTER
         if ((currTail + 1) % QUEUE_SIZE == head.load(cuda::memory_order_acquire)) {
             return false; // Queue full

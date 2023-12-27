@@ -47,26 +47,26 @@
 #     exit 1
 # fi
 
-# Compile gdrcopy_pplat
-echo "Compiling gdrcopy_pplat..."
-nvcc gdrcopy_pplat.cu gdrcopy_common.cpp -o gdrcopy_pplat -lrt -lpthread -I/etc/pliops -L/etc/pliops -lstorelib -g -G -arch=sm_80 -lcuda -lgdrapi
-
-# Check if server compilation was successful
-if [ $? -eq 0 ]; then
-    echo "gdrcopy_pplat compiled successfully."
-else
-    echo "gdrcopy_pplat compilation failed."
-    exit 1
-fi
-
-# Compile ucf
-# echo "Compiling unified_client_server (ucf)..."
-# nvcc unified_client_server.cu -o ucf -lrt -lpthread -I/etc/pliops -L/etc/pliops -lstorelib -g -G -arch=sm_80
+# # Compile gdrcopy_pplat
+# echo "Compiling gdrcopy_pplat..."
+# nvcc gdrcopy_pplat.cu gdrcopy_common.cpp -o gdrcopy_pplat -lrt -lpthread -I/etc/pliops -L/etc/pliops -lstorelib -g -G -arch=sm_80 -lcuda -lgdrapi
 
 # # Check if server compilation was successful
 # if [ $? -eq 0 ]; then
-#     echo "ucf compiled successfully."
+#     echo "gdrcopy_pplat compiled successfully."
 # else
-#     echo "ucf compilation failed."
+#     echo "gdrcopy_pplat compilation failed."
 #     exit 1
 # fi
+
+# Compile ucf
+echo "Compiling unified_client_server (ucf)..."
+nvcc unified_client_server.cu gdrcopy_common.cpp -o ucf -lrt -lpthread -I/etc/pliops -L/etc/pliops -lstorelib -g -G -arch=sm_80 -lcuda -lgdrapi
+
+# Check if server compilation was successful
+if [ $? -eq 0 ]; then
+    echo "ucf compiled successfully."
+else
+    echo "ucf compilation failed."
+    exit 1
+fi

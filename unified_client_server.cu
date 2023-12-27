@@ -1,7 +1,13 @@
 #include "common.cuh"
 #include "shared_queue.cuh"
 #include "/etc/pliops/store_lib_expo.h"
-//#include <cuda.h>
+#include <cuda.h>
+#include <cuda_runtime_api.h>
+
+
+#include "gdrapi.h"
+#include "gdrcopy_common.hpp"
+#include "gdr_gpu_memalloc.cuh"
 
 #define NO_OPTIONS 0
 #define NUM_ITERATIONS QUEUE_SIZE
@@ -73,14 +79,15 @@ void client_thread_func(LockFreeQueue<RequestMessage> *submission_queue, LockFre
     }
 }
 
-void server_func(LockFreeQueue<RequestMessage> *submission_queue, LockFreeQueue<ResponseMessage> *completion_queue, sem_t* p_server_semaphore, PLIOPS_DB_t plio_handle ){
+//void server_func(LockFreeQueue<RequestMessage> *submission_queue, LockFreeQueue<ResponseMessage> *completion_queue, sem_t* p_server_semaphore, PLIOPS_DB_t plio_handle ){
+void server_func(LockFreeQueue<RequestMessage> *submission_queue, LockFreeQueue<ResponseMessage> *completion_queue, PLIOPS_DB_t plio_handle ){
     uint actual_object_size = 0;
     int ret = 0;
     RequestMessage req_msg; // TODO guy move this into the while loop
     CommandType command = CommandType::NONE;
     int idx = 0;
     // Signal that initialization is done
-    sem_post(p_server_semaphore);
+    // sem_post(p_server_semaphore);
     
     while (command != CommandType::EXIT) {
         ResponseMessage res_msg;
@@ -167,33 +174,39 @@ bool storelib_deinit(PLIOPS_IDENTIFY_t& identify, PLIOPS_DB_t& plio_handle){
 }
 
 bool process_requests(PLIOPS_DB_t& plio_handle){
-    sem_t server_semaphore;
-    sem_init(&server_semaphore, 0, 0); // 0 - shared between threads of a process, 0 - initial value
+    // sem_t server_semaphore;
+    // sem_init(&server_semaphore, 0, 0); // 0 - shared between threads of a process, 0 - initial value
 
     LockFreeQueue<RequestMessage>* h_sq_p;
     LockFreeQueue<ResponseMessage>* h_cq_p;
+    CUdeviceptr d_cq_p; // NEW
+    GPUMemoryManager *gpu_mm = new GPUMemoryManager(); // NEW
 
     // Two queues - Allocate memory that is shared by the CPU and the GPU
     CUDA_ERRCHECK(cudaHostAlloc((void **)&h_sq_p, sizeof(LockFreeQueue<RequestMessage>), cudaHostAllocMapped));
-	CUDA_ERRCHECK(cudaHostAlloc((void **)&h_cq_p, sizeof(LockFreeQueue<ResponseMessage>), cudaHostAllocMapped));
+	//CUDA_ERRCHECK(cudaHostAlloc((void **)&h_cq_p, sizeof(LockFreeQueue<ResponseMessage>), cudaHostAllocMapped));
+    cudaGPUMemAlloc<LockFreeQueue<ResponseMessage>>(gpu_mm, &h_cq_p, d_cq_p);
+
 
     new (h_sq_p) LockFreeQueue<RequestMessage>();
     new (h_cq_p) LockFreeQueue<ResponseMessage>();
 
     // Launch a server thread
-    std::thread server_thread(server_func, h_sq_p, h_cq_p, &server_semaphore, plio_handle);
+    std::thread server_thread(server_func, h_sq_p, h_cq_p, plio_handle);
     server_thread.detach();
 
     // Wait for the server to signal its initialization is done
     //sem_wait(&server_semaphore);
     
     // Launch the kernel
-    client_thread_func<<<1,1>>>(h_sq_p, h_cq_p, 644);
+    client_thread_func<<<1,1>>>(h_sq_p, (LockFreeQueue<ResponseMessage> *)d_cq_p, 644);
+    ASSERTDRV(cuStreamSynchronize(0));
 
     CUDA_ERRCHECK(cudaDeviceSynchronize());
 	CUDA_ERRCHECK(cudaFreeHost(h_sq_p));
-    CUDA_ERRCHECK(cudaFreeHost(h_cq_p));
-    
+    //CUDA_ERRCHECK(cudaFreeHost(h_cq_p));
+    cudaGPUMemFree<LockFreeQueue<ResponseMessage>>(gpu_mm); //NEW
+    delete(gpu_mm); //NEW
     return true;
 }
 
@@ -214,9 +227,5 @@ int main() {
         std::cout << "Storelib deinitialization failed. Exiting." << std::endl;       
         return 1;
     }
-
-#if CUDA_VERSION >= 11000
-    printf ("My CUDA version is new!\n"); //TODO guy DELETE
-#endif
     return 0;
 }
