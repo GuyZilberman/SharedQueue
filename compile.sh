@@ -61,7 +61,7 @@
 
 # Compile ucf
 echo "Compiling unified_client_server (ucf)..."
-nvcc unified_client_server.cu gdrcopy_common.cpp -o ucf -lrt -lpthread -I/etc/pliops -L/etc/pliops -lstorelib -g -G -arch=sm_80 -lcuda -lgdrapi
+nvcc unified_client_server.cu gdrcopy_common.cpp -o ucf -lrt -lpthread -I/etc/pliops -L/etc/pliops -lstorelib -g -G -arch=sm_80 -lcuda -lgdrapi -rdc=true
 
 # Check if server compilation was successful
 if [ $? -eq 0 ]; then

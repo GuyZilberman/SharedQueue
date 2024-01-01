@@ -10,7 +10,7 @@
 #include "gdr_gpu_memalloc.cuh"
 
 #define NO_OPTIONS 0
-#define NUM_ITERATIONS QUEUE_SIZE
+#define NUM_ITERATIONS 644
 #define READ_START_ID NUM_ITERATIONS
 #define READ_END_ID 2*NUM_ITERATIONS-1
 
@@ -21,9 +21,13 @@ void InitData(int* arr, size_t size, int idx) {
 }
 
 __global__
-void client_thread_func(LockFreeQueue<RequestMessage> *submission_queue, LockFreeQueue<ResponseMessage> *completion_queue, const int num_iterations){
+//void client_thread_func(LockFreeQueue<RequestMessage> *submission_queue, LockFreeQueue<ResponseMessage> *completion_queue, const int num_iterations, cudaEvent_t &start1, cudaEvent_t &end1, cudaEvent_t &start2, cudaEvent_t &end2) {
+void client_thread_func(LockFreeQueue<RequestMessage> *submission_queue, LockFreeQueue<ResponseMessage> *completion_queue, const int num_iterations, float clockRatekHz) {
     uint idx = 0, request_id = 0;
     AnswerType answer = AnswerType::NONE;
+    int wrong_answers = 0; //TODO guy - WRITE-READ test
+
+    clock_t start1 = clock();
 
     // Send write requests
     while (idx < num_iterations){ 
@@ -32,7 +36,7 @@ void client_thread_func(LockFreeQueue<RequestMessage> *submission_queue, LockFre
         RequestMessage req_msg;
         req_msg.cmd = CommandType::WRITE;
         req_msg.request_id = request_id++;
-        InitData(req_msg.data, 256, idx);
+        InitData(req_msg.data, 256, idx); //TODO change 256 to req_mst.data's size
         req_msg.key = idx++;
         while (!submission_queue->push(req_msg)); // Busy-wait until the value is pushed successfully
 
@@ -41,8 +45,15 @@ void client_thread_func(LockFreeQueue<RequestMessage> *submission_queue, LockFre
         while (!completion_queue->pop(res_msg)); // Busy-wait for a command to be available
         // TODO guy check about this: Optional: backoff strategy to reduce CPU usage
         answer = res_msg.answer;
-        printf("Client: Received from completion queue: %d\n", (int)answer);
+        // printf("Client: Received from completion queue: %d\n", (int)answer); //TODO guy UNCOMMENT
     }
+    clock_t end1 = clock();
+    clock_t elapsedCycles1 = end1 - start1;
+    float timeMilliseconds1 = (float)elapsedCycles1 / clockRatekHz;
+    printf("Elapsed time 1: %.2f milliseconds\n", timeMilliseconds1);
+
+    //cudaEventRecord(start2);
+    clock_t start2 = clock();
 
     // Send read requests
     idx = 0;
@@ -59,8 +70,23 @@ void client_thread_func(LockFreeQueue<RequestMessage> *submission_queue, LockFre
         while (!completion_queue->pop(res_msg)); // Busy-wait for a command to be available
         // TODO guy check about this: Optional: backoff strategy to reduce CPU usage
         answer = res_msg.answer;
-        printf("Client: Received from completion queue: %d\n", (int)answer);
+        // printf("Client: Received from completion queue: %d\n", (int)answer); //TODO guy UNCOMMENT
+
+        if (res_msg.data[0] != res_msg.request_id - NUM_ITERATIONS){ //TODO guy - WRITE-READ test
+            printf("%d: res_msg.request_id\n", res_msg.request_id); //TODO guy - WRITE-READ test
+            wrong_answers++;
+        }
     }
+    //cudaEventRecord(end2);
+    clock_t end2 = clock();
+    clock_t elapsedCycles2 = end2 - start2;
+    float timeMilliseconds2 = (float)elapsedCycles2 / clockRatekHz;
+    printf("Elapsed time 2: %.2f milliseconds\n", timeMilliseconds2);
+
+
+    printf("---------------------\n");
+    printf("wrong answers: %d\n", wrong_answers); //TODO guy - WRITE-READ test
+    printf("---------------------\n");
 
     while (answer != AnswerType::EXIT)
     {
@@ -74,8 +100,8 @@ void client_thread_func(LockFreeQueue<RequestMessage> *submission_queue, LockFre
         ResponseMessage res_msg;
         while (!completion_queue->pop(res_msg)); // Busy-wait for a command to be available
         answer = res_msg.answer;
-        printf("Client: Received from completion queue: %d\n", (int)answer);
-        printf("Client: data[0] from completion queue: %d\n", res_msg.data[0]);
+        // printf("Client: Received from completion queue: %d\n", (int)answer); //TODO guy UNCOMMENT
+        // printf("Client: data[0] from completion queue: %d\n", res_msg.data[0]); //TODO guy UNCOMMENT
     }
 }
 
@@ -129,9 +155,9 @@ void server_func(LockFreeQueue<RequestMessage> *submission_queue, LockFreeQueue<
                 res_msg.answer = AnswerType::FAIL;
                 //TODO add: res_msg.error = ???;
             }
-        std::cout << idx << ": Before sending response message" << std::endl;
+        //std::cout << idx << ": Before sending response message" << std::endl; //TODO guy UNCOMMENT
         while (!completion_queue->push(res_msg)); // Busy-wait until the value is pushed successfully
-        std::cout << idx++ << ": After sending response message" << std::endl;
+        //std::cout << idx++ << ": After sending response message" << std::endl; //TODO guy UNCOMMENT
         //std::cout << "Server sent confirmation message with the answer: " << (int)res_msg.answer << std::endl;
 
     }
@@ -171,6 +197,11 @@ bool storelib_deinit(PLIOPS_IDENTIFY_t& identify, PLIOPS_DB_t& plio_handle){
 }
 
 bool process_requests(PLIOPS_DB_t& plio_handle){
+    cudaDeviceProp prop;
+    CUDA_ERRCHECK(cudaGetDeviceProperties(&prop, 0));
+    float clockRatekHz = prop.clockRate / 1.0f; // prop.clockRate is given in kHz
+    printf("GPU Clock Rate: %.2f kHz\n", clockRatekHz);
+
     LockFreeQueue<RequestMessage>* h_sq_p;
     LockFreeQueue<ResponseMessage>* h_cq_p;
     CUdeviceptr d_cq_p; // NEW
@@ -189,8 +220,8 @@ bool process_requests(PLIOPS_DB_t& plio_handle){
     server_thread.detach();
     
     // Launch the kernel
-    client_thread_func<<<1,1>>>(h_sq_p, (LockFreeQueue<ResponseMessage> *)d_cq_p, 644);
-    ASSERTDRV(cuStreamSynchronize(0));
+    client_thread_func<<<1,1>>>(h_sq_p, (LockFreeQueue<ResponseMessage> *)d_cq_p, NUM_ITERATIONS, clockRatekHz);
+    //client_thread_func<<<1, 1>>>(h_sq_p, (LockFreeQueue<ResponseMessage> *)d_cq_p, NUM_ITERATIONS, start1, end1, start2, end2);
 
     CUDA_ERRCHECK(cudaDeviceSynchronize());
 	CUDA_ERRCHECK(cudaFreeHost(h_sq_p));
