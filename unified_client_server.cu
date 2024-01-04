@@ -10,7 +10,7 @@
 #include "gdr_gpu_memalloc.cuh"
 
 #define NO_OPTIONS 0
-#define NUM_ITERATIONS 644
+#define NUM_ITERATIONS 1
 #define READ_START_ID NUM_ITERATIONS
 #define READ_END_ID 2*NUM_ITERATIONS-1
 
@@ -21,8 +21,8 @@ void InitData(int* arr, size_t size, int idx) {
 }
 
 __global__
-//void client_thread_func(LockFreeQueue<RequestMessage> *submission_queue, LockFreeQueue<ResponseMessage> *completion_queue, const int num_iterations, cudaEvent_t &start1, cudaEvent_t &end1, cudaEvent_t &start2, cudaEvent_t &end2) {
-void client_thread_func(LockFreeQueue<RequestMessage> *submission_queue, LockFreeQueue<ResponseMessage> *completion_queue, const int num_iterations, float clockRatekHz) {
+//void client_thread_func(HostAllocatedSubmissionQueue *submission_queue, DeviceAllocatedCompletionQueue *completion_queue, const int num_iterations, cudaEvent_t &start1, cudaEvent_t &end1, cudaEvent_t &start2, cudaEvent_t &end2) {
+void client_thread_func(HostAllocatedSubmissionQueue *submission_queue, DeviceAllocatedCompletionQueue *completion_queue, const int num_iterations, float clockRatekHz) {
     uint idx = 0, request_id = 0;
     AnswerType answer = AnswerType::NONE;
     int wrong_answers = 0; //TODO guy - WRITE-READ test
@@ -32,7 +32,7 @@ void client_thread_func(LockFreeQueue<RequestMessage> *submission_queue, LockFre
     // Send write requests
     while (idx < num_iterations){ 
         // Perform IO request
-        printf("submission_queue: before push idx is %d\n", idx);
+        //printf("submission_queue: before push idx is %d\n", idx); // UNCOMMENT
         RequestMessage req_msg;
         req_msg.cmd = CommandType::WRITE;
         req_msg.request_id = request_id++;
@@ -50,7 +50,7 @@ void client_thread_func(LockFreeQueue<RequestMessage> *submission_queue, LockFre
     clock_t end1 = clock();
     clock_t elapsedCycles1 = end1 - start1;
     float timeMilliseconds1 = (float)elapsedCycles1 / clockRatekHz;
-    printf("Elapsed time 1: %.2f milliseconds\n", timeMilliseconds1);
+    printf("WRITE Elapsed time 1: %.2f milliseconds\n", timeMilliseconds1);
 
     //cudaEventRecord(start2);
     clock_t start2 = clock();
@@ -63,6 +63,8 @@ void client_thread_func(LockFreeQueue<RequestMessage> *submission_queue, LockFre
         req_msg.request_id = request_id++;
         req_msg.key = idx++;
 
+        //GET_TIME(data[currTail] = msg, 123123123, "submission_queue->push(req_msg)");
+
         while (!submission_queue->push(req_msg)); // Busy-wait until the value is pushed successfully
 
         // Immediately wait for a response
@@ -73,7 +75,7 @@ void client_thread_func(LockFreeQueue<RequestMessage> *submission_queue, LockFre
         // printf("Client: Received from completion queue: %d\n", (int)answer); //TODO guy UNCOMMENT
 
         if (res_msg.data[0] != res_msg.request_id - NUM_ITERATIONS){ //TODO guy - WRITE-READ test
-            printf("%d: res_msg.request_id\n", res_msg.request_id); //TODO guy - WRITE-READ test
+            //printf("%d: res_msg.request_id\n", res_msg.request_id); //TODO guy - WRITE-READ test //TODO guy UNCOMMENT
             wrong_answers++;
         }
     }
@@ -81,7 +83,7 @@ void client_thread_func(LockFreeQueue<RequestMessage> *submission_queue, LockFre
     clock_t end2 = clock();
     clock_t elapsedCycles2 = end2 - start2;
     float timeMilliseconds2 = (float)elapsedCycles2 / clockRatekHz;
-    printf("Elapsed time 2: %.2f milliseconds\n", timeMilliseconds2);
+    printf("READ Elapsed time 2: %.2f milliseconds\n", timeMilliseconds2);
 
 
     printf("---------------------\n");
@@ -105,7 +107,7 @@ void client_thread_func(LockFreeQueue<RequestMessage> *submission_queue, LockFre
     }
 }
 
-void server_func(LockFreeQueue<RequestMessage> *submission_queue, LockFreeQueue<ResponseMessage> *completion_queue, PLIOPS_DB_t plio_handle ){
+void server_func(HostAllocatedSubmissionQueue *submission_queue, DeviceAllocatedCompletionQueue *completion_queue, PLIOPS_DB_t plio_handle ){
     uint actual_object_size = 0;
     int ret = 0;
     RequestMessage req_msg; // TODO guy move this into the while loop
@@ -123,8 +125,8 @@ void server_func(LockFreeQueue<RequestMessage> *submission_queue, LockFreeQueue<
             }
             else if (req_msg.cmd == CommandType::WRITE)
             {
-                std::cout << "Received: " << req_msg.data[0] << std::endl;
-                std::cout << req_msg.request_id << ": Calling PLIOPS_Put! Value: "  << req_msg.data[0] << std::endl;
+                //std::cout << "Received: " << req_msg.data[0] << std::endl;
+                //std::cout << req_msg.request_id << ": Calling PLIOPS_Put! Value: "  << req_msg.data[0] << std::endl;
                 ret = PLIOPS_Put(plio_handle, &req_msg.key, sizeof(req_msg.key), &req_msg.data, sizeof(req_msg.data), NO_OPTIONS); //TODO guy look into options
                 if (ret != 0) {
                     printf("PLIOPS_Put Failed ret=%d\n", ret);
@@ -199,34 +201,33 @@ bool storelib_deinit(PLIOPS_IDENTIFY_t& identify, PLIOPS_DB_t& plio_handle){
 bool process_requests(PLIOPS_DB_t& plio_handle){
     cudaDeviceProp prop;
     CUDA_ERRCHECK(cudaGetDeviceProperties(&prop, 0));
-    float clockRatekHz = prop.clockRate / 1.0f; // prop.clockRate is given in kHz
+    float clockRatekHz = prop.clockRate; // prop.clockRate is given in kHz
     printf("GPU Clock Rate: %.2f kHz\n", clockRatekHz);
 
-    LockFreeQueue<RequestMessage>* h_sq_p;
-    LockFreeQueue<ResponseMessage>* h_cq_p;
+    HostAllocatedSubmissionQueue* h_sq_p;
+    DeviceAllocatedCompletionQueue* h_cq_p;
     CUdeviceptr d_cq_p; // NEW
     GPUMemoryManager *gpu_mm = new GPUMemoryManager(); // NEW
 
     // Two queues - Allocate memory that is shared by the CPU and the GPU
-    CUDA_ERRCHECK(cudaHostAlloc((void **)&h_sq_p, sizeof(LockFreeQueue<RequestMessage>), cudaHostAllocMapped));
-    cudaGPUMemAlloc<LockFreeQueue<ResponseMessage>>(gpu_mm, &h_cq_p, d_cq_p);
+    CUDA_ERRCHECK(cudaHostAlloc((void **)&h_sq_p, sizeof(HostAllocatedSubmissionQueue), cudaHostAllocMapped));
+    cudaGPUMemAlloc<DeviceAllocatedCompletionQueue>(gpu_mm, &h_cq_p, d_cq_p);
 
 
-    new (h_sq_p) LockFreeQueue<RequestMessage>();
-    new (h_cq_p) LockFreeQueue<ResponseMessage>();
+    new (h_sq_p) HostAllocatedSubmissionQueue();
+    new (h_cq_p) DeviceAllocatedCompletionQueue(gpu_mm->mh);
 
     // Launch a server thread
     std::thread server_thread(server_func, h_sq_p, h_cq_p, plio_handle);
     server_thread.detach();
     
     // Launch the kernel
-    client_thread_func<<<1,1>>>(h_sq_p, (LockFreeQueue<ResponseMessage> *)d_cq_p, NUM_ITERATIONS, clockRatekHz);
-    //client_thread_func<<<1, 1>>>(h_sq_p, (LockFreeQueue<ResponseMessage> *)d_cq_p, NUM_ITERATIONS, start1, end1, start2, end2);
+    client_thread_func<<<1,1>>>(h_sq_p, (DeviceAllocatedCompletionQueue *)d_cq_p, NUM_ITERATIONS, clockRatekHz);
 
     CUDA_ERRCHECK(cudaDeviceSynchronize());
 	CUDA_ERRCHECK(cudaFreeHost(h_sq_p));
     //CUDA_ERRCHECK(cudaFreeHost(h_cq_p));
-    cudaGPUMemFree<LockFreeQueue<ResponseMessage>>(gpu_mm); //NEW
+    cudaGPUMemFree<DeviceAllocatedCompletionQueue>(gpu_mm); //NEW
     delete(gpu_mm); //NEW
     return true;
 }
